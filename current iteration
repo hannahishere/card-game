@@ -1,0 +1,227 @@
+#import the modules
+import pygame, os, random
+os.environ['SDL_VIDEO_CENTERED'] = '1'
+
+#initialise pygame
+pygame.font.init()
+
+#set colours
+BLACK = (0, 0, 0)
+WHITE = (255, 255, 255)
+RED = (255, 0, 0)
+GREEN = (0, 255, 0)
+BLUE = (0, 0, 255)
+
+turn = 0
+
+class Player(pygame.sprite.Sprite):
+    def __init__(self, position_x, position_y, hpposition_x, hp):
+        super().__init__()
+        self.position_x = position_x
+        self.position_y = position_y
+        self.hpposition_x = hpposition_x
+        self.hpposition_y = position_y
+        self.hp = hp
+        
+    def blitPlayer(self):
+        self.image = pygame.Surface((100,100))
+        self.image.fill(BLUE)
+        self.rect = self.image.get_rect()
+        game.screen.blit(self.image, (self.position_x, self.position_y))
+
+    def blitHealth(self):
+        heart = pygame.image.load('heart.png')
+        hp_str = str(self.hp)
+        hpFont = pygame.font.Font(None, 50)
+        hpText = hpFont.render(hp_str, True, BLACK, WHITE)
+        game.screen.blit(heart, (self.hpposition_x, self.hpposition_y))
+        game.screen.blit(hpText, (self.hpposition_x, self.hpposition_y + 60))
+        
+
+    #function when a heal card is played, also ensures health does not exceed 100.
+    def heal(self):
+        if self.hp <= 85:
+            self.hp += 15
+        elif hp > 85:
+            self.hp = 100
+
+    #function when an attack card is drawn
+    def attacked(self):
+        self.hp -= 20
+
+    
+class Card(pygame.sprite.Sprite):
+    def __init__(self, game):
+        super().__init__()
+        self.game = game
+        self.face = "down" #cards start off face down in pile
+        self.image = pygame.Surface((120, 180)) #cards width and height
+        Card.faceColour(self, self.face)
+        self.image.fill(self.colour) #fill the card with the corresponding colour
+        self.rect = self.image.get_rect() #create the card object
+
+    def faceColour(self, face):
+        if self.face == "down":
+            self.colour = BLACK #back of card will be black (placeholder) for now
+        else:
+             self.colour = WHITE #generic for now, white background
+        return self.colour
+
+    def flip(self):
+        self.face = "up"
+        self.faceColour(self.face) #flip the card over to display upwards
+        self.update()
+
+
+class Deck():
+    def __init__(self):
+        self.cards = []
+
+    def initialiseDeck(self):
+        for i in range(30):
+            self.cards.append(Card(self)) #adds 30 cards to the pile
+        Deck.shuffle(self) #shuffle the deck
+        return self.cards
+
+    def shuffle(self):
+        random.shuffle(self.cards) #shuffles the cards, changes order - useful when card types added, and can later add shuffle card?
+        return self.cards
+
+    def blitDeck(self):
+        if len(self.cards) == 1:
+            game.screen.blit(self.cards[0].image, (500, 300))
+        elif len(self.cards) >= 2:
+            game.screen.blit(self.cards[1].image, (500, 300))
+            game.screen.blit(self.cards[0].image, (500, 300))
+
+    def deckClick(self, mousePos):
+        if self.cards[0].leftBoundX <= mousePos(0) and mousePos(0) <= self.cards[0].rightBoundX and self.cards[0].lowerBoundY >= mousePos(1) and mousePos(1) >= self.cards[0].upperBoundY:
+            humanHand.drawCards_p()
+
+
+class PlayerHand():
+    def __init__(self):
+        self.hand = []
+
+    def initialiseHand(self):
+        if turn == 0:
+            for i in range(5):
+                self.drawCards_p()
+        else:
+            for i in range(5):
+                self.drawCards_c()
+        return self.hand
+
+
+    def blitHand_p(self):
+        handPos_x = 250
+        handPos_y = 650
+        for card in range(len(self.hand)):
+            game.screen.blit(self.hand[card].image, (handPos_x, handPos_y))
+            handPos_x += 130
+
+    def blitHand_c(self):
+        handPos_x = 1190
+        handPos_y = 30
+        for card in range(len(self.hand)):
+            game.screen.blit(self.hand[card].image, (handPos_x, handPos_y))
+            handPos_x -= 130
+
+    def drawCards_p(self):
+        global turn
+        drawn = deck.cards.pop(0)
+        drawn.flip()
+        self.hand.append(drawn)
+        turn += 1
+
+    def drawCards_c(self):
+        global turn
+        drawn = deck.cards.pop(0)
+        self.hand.append(drawn)
+        turn -= 1
+
+class PlayPile():
+    def __init__(self):
+        self.cardsPlayed = []
+        
+    def move_card(self, playedCard):
+        self.card_on_top = playedCard
+        playedCard = Card.flip(playedCard)
+        self.cardsPlayed.append(playedCard)
+
+    def blitPlayed(self):
+        screen.blit(self.cardsPlayed[0].image, (800, 300))
+
+
+class Game():
+    def __init__(self):
+        pygame.init()
+        self.clock = pygame.time.Clock()
+        self.screen = pygame.display.set_mode((1530, 790))
+        pygame.display.set_caption("Card game")
+        self.fps = 60
+
+    def events(self):
+        self.mouse_pressed = 0
+        self.mouse_pos = pygame.mouse.get_pos()
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                self.running = False
+            elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                deck.deckClick(pygame.mouse.get_pos())
+                
+    def draw(self):
+        background()
+        deck.blitDeck()
+        human.blitPlayer()
+        human.blitHealth()
+        humanHand.blitHand_p()
+        cpu.blitHealth()
+        cpu.blitPlayer()
+        cpuHand.blitHand_c()
+        notifications(turn)
+
+    def run(self):
+        self.running = True
+        while self.running:
+            self.clock.tick(self.fps)
+            self.events()
+            self.draw()
+        pygame.quit()
+
+
+#when a player decides to draw a card, this will be carried out
+#applies to human only
+def playCards(clicked):
+    playedCard = clicked
+    human.Hand.cards.pop(playedCard)
+    PlayPile.move_card(playedCard)
+
+#blit the background onto the screen
+def background():
+    bg = pygame.image.load('Scene-1_resized.jpg')
+    game.screen.blit(bg, (0, 0))
+
+def notifications(turn):
+    notificationFont = pygame.font.Font(None, 50)
+    if turn == 0:
+        current = notificationFont.render("It's your turn.", True, BLACK, WHITE)
+        game.screen.blit(current, (10, 10))
+    elif turn == 1:
+        current = notificationFont.render("It's your opponent's turn.", True, BLACK, WHITE)
+        game.screen.blit(current, (10, 10))
+
+
+deck = Deck()
+deck.initialiseDeck()
+humanHand = PlayerHand()
+humanHand.initialiseHand()
+cpuHand = PlayerHand()
+cpuHand.initialiseHand()
+
+#create 2 players, human and computer with positions of where they will be drawn (x and y) and their initial hp, set to max
+human = Player(60, 650, 180, 100)
+cpu = Player(1400, 30, 1320, 100)
+
+game = Game()
+game.run()
