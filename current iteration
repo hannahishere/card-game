@@ -36,6 +36,10 @@ class Player(pygame.sprite.Sprite):
         hpText = hpFont.render(hp_str, True, BLACK, WHITE)
         game.screen.blit(heart, (self.hpposition_x, self.hpposition_y))
         game.screen.blit(hpText, (self.hpposition_x, self.hpposition_y + 60))
+
+    def checkHealth(self):
+        if self.hp <= 0:
+            game.running = False
         
 
     #function when a heal card is played, also ensures health does not exceed 100.
@@ -48,6 +52,12 @@ class Player(pygame.sprite.Sprite):
     #function when an attack card is drawn
     def attacked(self):
         self.hp -= 20
+    
+    #function for computer, allows them to make a decision to play/draw - for now i will keep this random
+    def compDecisions():
+        #draw a card if their hand is empty
+        if len(cpuHand) == 0:
+            cpuHand.drawCards_c()
 
     
 class Card(pygame.sprite.Sprite):
@@ -59,6 +69,7 @@ class Card(pygame.sprite.Sprite):
         Card.faceColour(self, self.face)
         self.image.fill(self.colour) #fill the card with the corresponding colour
         self.rect = self.image.get_rect() #create the card object
+        self.in_hand = False
 
     def faceColour(self, face):
         if self.face == "down":
@@ -71,6 +82,12 @@ class Card(pygame.sprite.Sprite):
         self.face = "up"
         self.faceColour(self.face) #flip the card over to display upwards
         self.update()
+
+    def on_click(self):
+        if self.game.mouse_pressed == 1 and self.rect.collidepoint(self.game.mouse_pos) and self.in_hand == False:
+            humanHand.drawCards_p()
+        elif self.game.mouse_pressed == 1 and self.rect.collidepoint(self.game.mouse_pos) and self.in_hand == True:
+            playCards()
 
 
 class Deck():
@@ -93,10 +110,6 @@ class Deck():
         elif len(self.cards) >= 2:
             game.screen.blit(self.cards[1].image, (500, 300))
             game.screen.blit(self.cards[0].image, (500, 300))
-
-    def deckClick(self, mousePos):
-        if self.cards[0].leftBoundX <= mousePos(0) and mousePos(0) <= self.cards[0].rightBoundX and self.cards[0].lowerBoundY >= mousePos(1) and mousePos(1) >= self.cards[0].upperBoundY:
-            humanHand.drawCards_p()
 
 
 class PlayerHand():
@@ -132,12 +145,15 @@ class PlayerHand():
         drawn = deck.cards.pop(0)
         drawn.flip()
         self.hand.append(drawn)
+        drawn.in_hand = True
+        #human.checkHealth()
         turn += 1
 
     def drawCards_c(self):
         global turn
         drawn = deck.cards.pop(0)
         self.hand.append(drawn)
+        #cpu.checkHealth()
         turn -= 1
 
 class PlayPile():
@@ -167,10 +183,13 @@ class Game():
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 self.running = False
-            elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-                deck.deckClick(pygame.mouse.get_pos())
+            elif event.type == pygame.MOUSEBUTTONDOWN:
+                self.mouse_pressed = event.button
+                if self.mouse_pressed == 1:
+                    Card.on_click(self.mouse_pos)
                 
     def draw(self):
+        print("starting draw")
         background()
         deck.blitDeck()
         human.blitPlayer()
@@ -180,13 +199,15 @@ class Game():
         cpu.blitPlayer()
         cpuHand.blitHand_c()
         notifications(turn)
+        pygame.display.update()
+        print("Done draw")
 
     def run(self):
         self.running = True
         while self.running:
             self.clock.tick(self.fps)
-            self.events()
             self.draw()
+            self.events()
         pygame.quit()
 
 
@@ -196,10 +217,11 @@ def playCards(clicked):
     playedCard = clicked
     human.Hand.cards.pop(playedCard)
     PlayPile.move_card(playedCard)
+    
 
 #blit the background onto the screen
 def background():
-    bg = pygame.image.load('Scene-1_resized.jpg')
+    bg = pygame.image.load('Scene-1_resized.jpg').convert_alpha()
     game.screen.blit(bg, (0, 0))
 
 def notifications(turn):
@@ -210,6 +232,7 @@ def notifications(turn):
     elif turn == 1:
         current = notificationFont.render("It's your opponent's turn.", True, BLACK, WHITE)
         game.screen.blit(current, (10, 10))
+
 
 
 deck = Deck()
