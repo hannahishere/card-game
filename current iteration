@@ -54,10 +54,18 @@ class Player(pygame.sprite.Sprite):
         self.hp -= 20
     
     #function for computer, allows them to make a decision to play/draw - for now i will keep this random
-    def compDecisions():
+    def comDecisions():
         #draw a card if their hand is empty
         if len(cpuHand) == 0:
             cpuHand.drawCards_c()
+        #random choice for the computer if they have cards in their hand, for now
+        else:
+            choice = random.randint(0, 1)
+            if choice == 0:
+                cpuHand.drawCards_c()
+            else:
+                played = cpuHand.cards.pop(0)
+                PlayPile.move_card(played)         
 
     
 class Card(pygame.sprite.Sprite):
@@ -83,21 +91,29 @@ class Card(pygame.sprite.Sprite):
         self.faceColour(self.face) #flip the card over to display upwards
         self.update()
 
-    def on_click(self):
-        if self.game.mouse_pressed == 1 and self.rect.collidepoint(self.game.mouse_pos) and self.in_hand == False:
+    def on_click(self, mouse_pos):
+        print("checking")
+        if game.mouse_pressed == 1 and self.rect.collidepoint(mouse_pos) and self.in_hand == False:
+            print("deck click")
             humanHand.drawCards_p()
-        elif self.game.mouse_pressed == 1 and self.rect.collidepoint(self.game.mouse_pos) and self.in_hand == True:
-            playCards()
+        elif game.mouse_pressed == 1 and self.rect.collidepoint(mouse_pos) and self.in_hand == True:
+            print("hand card click")
+            playCards(clicked)
+        else:
+            print("no card clicked")
 
 
 class Deck():
     def __init__(self):
         self.cards = []
+        self.allCards = pygame.sprite.Group()
 
-    def initialiseDeck(self):
+    def initialiseDeck(self,game):
         for i in range(30):
+            card = Card(self)
             self.cards.append(Card(self)) #adds 30 cards to the pile
-        Deck.shuffle(self) #shuffle the deck
+            self.allCards.add(card) #create a group of all cards in the game to loop through
+        random.shuffle(self.cards) #shuffle the deck
         return self.cards
 
     def shuffle(self):
@@ -113,8 +129,9 @@ class Deck():
 
 
 class PlayerHand():
-    def __init__(self):
+    def __init__(self, game):
         self.hand = []
+        self.game = game
 
     def initialiseHand(self):
         if turn == 0:
@@ -130,19 +147,19 @@ class PlayerHand():
         handPos_x = 250
         handPos_y = 650
         for card in range(len(self.hand)):
-            game.screen.blit(self.hand[card].image, (handPos_x, handPos_y))
+            self.game.screen.blit(self.hand[card].image, (handPos_x, handPos_y))
             handPos_x += 130
 
     def blitHand_c(self):
         handPos_x = 1190
         handPos_y = 30
         for card in range(len(self.hand)):
-            game.screen.blit(self.hand[card].image, (handPos_x, handPos_y))
+            self.game.screen.blit(self.hand[card].image, (handPos_x, handPos_y))
             handPos_x -= 130
 
     def drawCards_p(self):
         global turn
-        drawn = deck.cards.pop(0)
+        drawn = self.game.deck.cards.pop(0)
         drawn.flip()
         self.hand.append(drawn)
         drawn.in_hand = True
@@ -151,10 +168,12 @@ class PlayerHand():
 
     def drawCards_c(self):
         global turn
-        drawn = deck.cards.pop(0)
+        drawn = self.game.deck.cards.pop(0)
         self.hand.append(drawn)
         #cpu.checkHealth()
         turn -= 1
+
+
 
 class PlayPile():
     def __init__(self):
@@ -170,12 +189,20 @@ class PlayPile():
 
 
 class Game():
-    def __init__(self):
+    def __init__(self, human, cpu):
         pygame.init()
         self.clock = pygame.time.Clock()
         self.screen = pygame.display.set_mode((1530, 790))
         pygame.display.set_caption("Card game")
         self.fps = 60
+        self.deck = Deck()
+        self.deck.initialiseDeck(self)
+        self.humanHand = PlayerHand(self)
+        self.humanHand.initialiseHand()
+        self.cpuHand = PlayerHand(self)
+        self.cpuHand.initialiseHand()
+        self.human = human
+        self.cpu = cpu
 
     def events(self):
         self.mouse_pressed = 0
@@ -186,21 +213,21 @@ class Game():
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 self.mouse_pressed = event.button
                 if self.mouse_pressed == 1:
-                    Card.on_click(self.mouse_pos)
+                    for card in self.deck.allCards.sprites():
+                        print("click")
+                        card.on_click(self.mouse_pos)
                 
     def draw(self):
-        print("starting draw")
         background()
-        deck.blitDeck()
-        human.blitPlayer()
-        human.blitHealth()
-        humanHand.blitHand_p()
-        cpu.blitHealth()
-        cpu.blitPlayer()
-        cpuHand.blitHand_c()
+        self.deck.blitDeck()
+        self.human.blitPlayer()
+        self.human.blitHealth()
+        self.humanHand.blitHand_p()
+        self.cpu.blitHealth()
+        self.cpu.blitPlayer()
+        self.cpuHand.blitHand_c()
         notifications(turn)
         pygame.display.update()
-        print("Done draw")
 
     def run(self):
         self.running = True
@@ -215,7 +242,7 @@ class Game():
 #applies to human only
 def playCards(clicked):
     playedCard = clicked
-    human.Hand.cards.pop(playedCard)
+    humanHand.cards.pop(playedCard)
     PlayPile.move_card(playedCard)
     
 
@@ -234,17 +261,9 @@ def notifications(turn):
         game.screen.blit(current, (10, 10))
 
 
-
-deck = Deck()
-deck.initialiseDeck()
-humanHand = PlayerHand()
-humanHand.initialiseHand()
-cpuHand = PlayerHand()
-cpuHand.initialiseHand()
-
 #create 2 players, human and computer with positions of where they will be drawn (x and y) and their initial hp, set to max
 human = Player(60, 650, 180, 100)
 cpu = Player(1400, 30, 1320, 100)
 
-game = Game()
+game = Game(human, cpu)
 game.run()
