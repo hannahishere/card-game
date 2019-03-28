@@ -518,7 +518,7 @@ class Game():
         pygame.init()
         self.clock = pygame.time.Clock()
         self.screen = pygame.display.set_mode((1530, 790))
-        pygame.display.set_caption("Card game")
+        pygame.display.set_caption("SNAP")
         self.fps = 60
         self.deck = Deck()
         self.deck.initialiseDeck(self)
