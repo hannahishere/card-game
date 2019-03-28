@@ -80,7 +80,6 @@ class Player(pygame.sprite.Sprite):
             game.loser = "draw"
         #if the deck is empty this will happen
         elif len(game.deck.cards) == 0:
-            print('1')
             if lastCardPlayed == "damage" or lastCardPlayed == "lifeSteal":
                 if "undo" in cardsPresent:
                     #will either undo, just play a random card or draw
@@ -130,9 +129,7 @@ class Player(pygame.sprite.Sprite):
                 self.comPlay(playing)
             #if there is no card to heal and the computer decides not to undo, any card will be played/card will be drawn
         else:
-            print('2')
             if len(game.playPile.cardsPlayed) > 0:
-                print('3')
                 #chance to undo a damage or a life steal card
                 if lastCardPlayed == "damage" or lastCardPlayed == "lifeSteal":
                     if "undo" in cardsPresent:
@@ -199,7 +196,6 @@ class Player(pygame.sprite.Sprite):
                         playing = random.randint(0, (len(game.cpuHand.hand)-1))
                         self.comPlay(playing)
             else:
-                print('5')
                 choice = random.randint(0, 1)
                 if choice == 0:
                     game.cpuHand.drawCards_c()
@@ -344,14 +340,11 @@ class Card(pygame.sprite.Sprite):
                 
                 
     def on_click(self, mouse_pos):
-        print(self.rect, mouse_pos)
         if self.rect.collidepoint(mouse_pos) and self.in_hand == 0: #if a card has been clicked and it is in the deck, the card will be drawn
             game.humanHand.drawCards_p()
             game.deck_clicked = True
         elif self.rect.collidepoint(mouse_pos) and self.in_hand == 1: #if a card has been clicked and it is in the player's hand, it will be played           
             game.hand_clicked = True
-        else: #if no card has been clicked or the card is in the computer's hand or the play pile (where it can no longer be interacted with) nothing will happen
-            print("")
 
 
 class Deck():
@@ -579,6 +572,7 @@ class Game():
             if turn == 0:
                 self.events()
             else:
+                pygame.time.wait(500)
                 game.cpu.comDecisions()
             game.human.checkHealth()
             game.cpu.checkHealth()
