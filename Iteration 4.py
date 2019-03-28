@@ -1,0 +1,622 @@
+#import the modules
+import pygame, os, random
+os.environ['SDL_VIDEO_CENTERED'] = '1'
+
+#initialise pygame
+pygame.font.init()
+
+#set colours
+BLACK = (0, 0, 0)
+WHITE = (255, 255, 255)
+BLUE = (0, 0, 255)
+
+turn = 0
+
+playerTakenTurn = False
+canUndo = False
+
+
+class Player(pygame.sprite.Sprite):
+    def __init__(self, position_x, position_y, hpposition_x, hp):
+        super().__init__()
+        self.position_x = position_x
+        self.position_y = position_y
+        self.hpposition_x = hpposition_x
+        self.hpposition_y = position_y
+        self.hp = hp
+        self.dead = False
+        
+    def blitPlayer(self):
+        self.image = pygame.Surface((100,100))
+        self.image.fill(BLUE)
+        self.rect = self.image.get_rect()
+        game.screen.blit(self.image, (self.position_x, self.position_y))
+
+    def blitHealth(self):
+        heart = pygame.image.load('heart.png')
+        hp_str = str(self.hp)
+        hpFont = pygame.font.Font(None, 50)
+        hpText = hpFont.render(hp_str, True, BLACK, WHITE)
+        game.screen.blit(heart, (self.hpposition_x, self.hpposition_y))
+        game.screen.blit(hpText, (self.hpposition_x, self.hpposition_y + 60))
+
+    def checkHealth(self):
+        if self.hp <= 0:
+            self.dead = True
+        
+
+    #function when a heal card is played, also ensures health does not exceed 100.
+    def heal(self):
+        if self.hp <= 85:
+            self.hp += 15
+        elif self.hp > 85:
+            self.hp = 100
+
+    def undoHeal(self):
+        self.hp -= 15
+
+    #function when an attack card is drawn
+    def attacked(self):
+        self.hp -= 20
+
+    def undoAttack(self):
+        self.hp += 20
+
+    def healthStolen(self):
+        self.hp -= 15
+    
+    #function for computer, allows them to make a decision to play/draw
+    def comDecisions(self):
+        lastCardPlayed = "no card last played"
+        if len(game.playPile.cardsPlayed) > 0:
+            lastCardPlayed = game.playPile.cardsPlayed[len(game.playPile.cardsPlayed)-1].cardType
+        cardsPresent = game.cpuHand.cardsInHand()
+        #draw a card if their hand is empty
+        if len(game.cpuHand.hand) == 0:
+            print("CPU drawing")
+            game.cpuHand.drawCards_c()
+        elif len(game.cpuHand.hand) == 0 and len(game.deck.cards) == 0:
+            print("Give up")
+            game.loser = "draw"
+        #if the deck is empty this will happen
+        elif len(game.deck.cards) == 0:
+            if lastCardPlayed == "damage" or lastCardPlayed == "lifeSteal":
+                if "undo" in cardsPresent:
+                    #will either undo, just play a random card or draw
+                    choice = random.randint(0, 1)
+                    if choice == 0:
+                        for card in game.cpuHand.hand:
+                            if card.cardType == "undo":
+                                playing = game.cpuHand.hand.index(card)
+                                self.comPlay(playing)
+                                break
+                    else:
+                        playing = random.randint(0, (len(game.cpuHand.hand)-1))
+                        self.comPlay(playing)
+            #if health is low, the cpu will try to heal
+            elif self.hp <= 50:
+                if "heal" in cardsPresent and "lifeSteal" in cardsPresent:
+                    choice = random.randint(0, 1)
+                    if choice == 0:
+                        for card in game.cpuHand.hand:
+                            if card.cardType == "heal":
+                                playing = game.cpuHand.hand.index(card)
+                                self.comPlay(playing)
+                                break
+                    else:
+                        for card in game.cpuHand.hand:
+                            if card.cardType == "lifeSteal":
+                                playing = game.cpuHand.hand.index(card)
+                                self.comPlay(playing)
+                                break
+                elif "heal" in cardsPresent:
+                    for card in game.cpuHand.hand:
+                        if card.cardType == "heal":
+                            playing = game.cpuHand.hand.index(card)
+                            self.comPlay(playing)
+                            break
+                elif "lifeSteal" in cardsPresent:
+                    for card in game.cpuHand.hand:
+                        if card.cardType == "lifeSteal":
+                            playing = game.cpuHand.hand.index(card)
+                            self.comPlay(playing)
+                            break
+                else:
+                    playing = random.randint(0, (len(game.cpuHand.hand)-1))
+                    self.comPlay(playing)
+            else:
+                playing = random.randint(0, (len(game.cpuHand.hand)-1))
+                self.comPlay(playing)
+            #if there is no card to heal and the computer decides not to undo, any card will be played/card will be drawn
+        else:
+            if len(game.playPile.cardsPlayed) > 0:
+                #chance to undo a damage or a life steal card
+                if lastCardPlayed == "damage" or lastCardPlayed == "lifeSteal":
+                    if "undo" in cardsPresent:
+                        #will either undo, just play a random card or draw
+                        choice = random.randint(0, 2)
+                        if choice == 0:
+                            for card in game.cpuHand.hand:
+                                if card.cardType == "undo":
+                                    playing = game.cpuHand.hand.index(card)
+                                    self.comPlay(playing)
+                                    break
+                        elif choice == 1:
+                            playing = random.randint(0, (len(game.cpuHand.hand)-1))
+                            self.comPlay(playing)
+                        else:
+                            game.cpuHand.drawCards_c()
+                    else:
+                        choice = random.randint(0, 1)
+                        if choice == 0:
+                            game.cpuHand.drawCards_c()
+                        else:
+                            playing = random.randint(0, (len(game.cpuHand.hand)-1))
+                            self.comPlay(playing)
+                else:
+                    choice = random.randint(0, 1)
+                    if choice == 0:
+                        game.cpuHand.drawCards_c()
+                    else:
+                        playing = random.randint(0, (len(game.cpuHand.hand)-1))
+                        self.comPlay(playing)
+            #if health is low, the cpu will try to heal
+            elif self.hp <= 50:
+                if "heal" in cardsPresent or "lifeSteal" in cardsPresent:
+                    choice = random.randint(0, 1)
+                    if choice == 0:
+                        for card in game.cpuHand.hand:
+                            if card.cardType == "heal":
+                                playing = game.cpuHand.hand.index(card)
+                                self.comPlay(playing)
+                                break
+                    else:
+                        for card in game.cpuHand.hand:
+                            if card.cardType == "lifeSteal":
+                                playing = game.cpuHand.hand.index(card)
+                                self.comPlay(playing)
+                                break
+                elif "heal" in cardsPresent:
+                    for card in game.cpuHand.hand:
+                        if card.cardType == "heal":
+                            playing = game.cpuHand.hand.index(card)
+                            self.comPlay(playing)
+                            break
+                elif "lifeSteal" in cardsPresent:
+                    for card in game.cpuHand.hand:
+                        if card.cardType == "lifeSteal":
+                            playing = game.cpuHand.hand.index(card)
+                            self.comPlay(playing)
+                            break
+                else:
+                    choice = random.randint(0, 1)
+                    if choice == 0:
+                        game.cpuHand.drawCards_c()
+                    else:
+                        playing = random.randint(0, (len(game.cpuHand.hand)-1))
+                        self.comPlay(playing)
+            else:
+                choice = random.randint(0, 1)
+                if choice == 0:
+                    game.cpuHand.drawCards_c()
+                else:
+                    playing = random.randint(0, (len(game.cpuHand.hand)-1))
+                    self.comPlay(playing)
+                    
+
+    def comPlay(self, playing):
+        played = game.cpuHand.hand.pop(playing)
+        game.playPile.move_card(played)
+            
+
+    
+class Card(pygame.sprite.Sprite):
+    def __init__(self, game, cardType, topleft):
+        super().__init__()
+        self.game = game
+        self.cardType = cardType
+        self.faceUp = False #cards start off face down in pile
+        self.image = pygame.Surface((120, 180)) #cards width and height
+        self.cardColour(self.faceUp, self.cardType)
+        self.rect = self.image.get_rect() #create the card object
+        self.rect.topleft = topleft
+        self.in_hand = 0
+
+    def cardColour(self, faceUp, cardType):
+        if self.faceUp == False:
+            back_img = pygame.image.load('card_back.png')
+            self.image = back_img
+        else:
+            if self.cardType == "skip":
+                skip_img = pygame.image.load('skip.png')
+                self.image = skip_img
+            elif self.cardType == "attack":
+                attack_img = pygame.image.load('attack.png')
+                self.image = attack_img
+            elif self.cardType == "heal":
+                heal_img = pygame.image.load('heal.png')
+                self.image = heal_img
+            elif self.cardType == "lifeSteal":
+                stealhp_img = pygame.image.load('steal_hp.png')
+                self.image = stealhp_img
+            elif self.cardType == "cardSteal":
+                stealcard_img = pygame.image.load('steal_card.png')
+                self.image = stealcard_img
+            elif self.cardType == "undo":
+                undo_img = pygame.image.load('undo.png')
+                self.image = undo_img
+
+    def interaction(self, cardType):
+        global turn
+        if self.cardType == "skip":
+            if turn == 0:
+                turn += 1
+            else:
+                turn -= 1
+        elif self.cardType == "attack":
+            if turn == 0:
+                game.cpu.attacked()
+            else:
+                game.human.attacked()
+        elif self.cardType == "heal":
+            if turn == 0:
+                game.human.heal()
+            else:
+                game.cpu.heal()
+        elif self.cardType == "lifeSteal":
+            if turn == 0:
+                game.cpu.healthStolen()
+                game.human.heal()
+            else:
+                game.human.healthStolen()
+                game.cpu.heal()
+        elif self.cardType == "cardSteal":
+            if turn == 0:
+                randomCard = random.randint(0, (len(game.cpuHand.hand)-1))
+                stealing = game.cpuHand.hand.pop(randomCard)
+                stealing.faceUp = True
+                stealing.cardColour(stealing.faceUp, stealing.cardType)
+                stealing.in_hand = 1
+                game.humanHand.hand.append(stealing)
+                game.humanHand.blitHand_p
+            else:
+                randomCard = random.randint(0, (len(game.humanHand.hand)-1))
+                stealing = game.humanHand.hand.pop(randomCard)
+                stealing.faceUp = False
+                stealing.cardColour(stealing.faceUp, stealing.cardType)
+                stealing.in_hand = 2
+                game.cpuHand.hand.append(stealing)
+                game.cpuHand.blitHand_c
+        elif self.cardType == "undo":
+            global lastPlayer
+            if canUndo == True:
+                lastPlayed = game.playPile.cardsPlayed[len(game.playPile.cardsPlayed)-2]
+                print("card being undone = ", lastPlayed.cardType)
+                if lastPlayed.cardType == "skip":
+                    if turn == 0:
+                        turn += 1
+                    elif turn == 1:
+                        turn -= 1
+                elif lastPlayed.cardType == "attack":
+                    if lastPlayer == "human":
+                        game.cpu.undoAttack()
+                        print("cpu attack undone")
+                    else:
+                        game.human.undoAttack()
+                        print("human attack undone")
+                elif lastPlayed.cardType == "heal":
+                    if lastPlayer == "human":
+                        game.human.undoHeal()
+                        print("human heal undone")
+                    else:
+                        game.cpu.undoHeal()
+                        print("cpu heal undone")
+                elif lastPlayed.cardType == "lifeSteal":
+                    if lastPlayer == "human":
+                        game.human.undoHeal()
+                        game.cpu.heal()
+                        print("life steal undone - human loses hp, cpu gains hp")
+                    else:
+                        game.cpu.undoHeal()
+                        game.human.heal()
+                        print("life steal undone - human gains hp, cpu loses hp")
+                elif lastPlayed.cardType == "cardSteal":
+                    if lastPlayer == "human":
+                        returning = game.humanHand.hand.pop(len(game.humanHand.hand)-1)
+                        returning.faceUp = False
+                        returning.cardColour(returning.faceUp, returning.cardType)
+                        returning.in_hand = 2
+                        game.cpuHand.hand.append(returning)
+                        game.cpuHand.blitHand_c
+                        print("card steal undone - card returned to computer")
+                    else:
+                        returning = game.cpuHand.hand.pop(len(game.cpuHand.hand)-1)
+                        returning.faceUp = True
+                        returning.cardColour(returning.faceUp, returning.cardType)
+                        returning.in_hand = 1
+                        game.humanHand.hand.append(returning)
+                        game.humanHand.blitHand_p
+                        print("card steal undone - card returned to human")
+                
+                
+    def on_click(self, mouse_pos):
+        if self.rect.collidepoint(mouse_pos) and self.in_hand == 0: #if a card has been clicked and it is in the deck, the card will be drawn
+            game.humanHand.drawCards_p()
+            game.deck_clicked = True
+        elif self.rect.collidepoint(mouse_pos) and self.in_hand == 1: #if a card has been clicked and it is in the player's hand, it will be played           
+            game.hand_clicked = True
+
+
+class Deck():
+    def __init__(self):
+        self.cards = []
+        self.allCards = pygame.sprite.Group()
+
+    def initialiseDeck(self, game):
+        for i in range(6):
+            card = Card(game, "skip", (500, 300))
+            self.cards.append(card) #adds cards to the pile
+            self.allCards.add(card) #create a group of all cards in the game to loop through
+        for i in range(9):
+            card = Card(game, "attack", (500, 300))
+            self.cards.append(card)
+            self.allCards.add(card)
+        for i in range(6):
+            card = Card(game, "heal", (500, 300))
+            self.cards.append(card)
+            self.allCards.add(card)
+        for i in range(3):
+            card = Card(game, "lifeSteal", (500, 300))
+            self.cards.append(card)
+            self.allCards.add(card)
+        for i in range(6):
+            card = Card(game, "cardSteal", (500, 300))
+            self.cards.append(card)
+            self.allCards.add(card)
+        for i in range(4):
+            card = Card(game, "undo", (500, 300))
+            self.cards.append(card)
+            self.allCards.add(card)
+        random.shuffle(self.cards) #shuffle the deck
+        return self.cards
+
+    def shuffle(self):
+        random.shuffle(self.cards) #shuffles the cards, changes order - useful when card types added, and can later add shuffle card?
+        return self.cards
+
+    def blitDeck(self):
+        if len(self.cards) == 1:
+            game.screen.blit(self.cards[0].image, (self.cards[0].rect.topleft))
+        elif len(self.cards) >= 2:
+            game.screen.blit(self.cards[1].image, (self.cards[1].rect.topleft))
+            game.screen.blit(self.cards[0].image, (self.cards[0].rect.topleft))
+
+
+class PlayerHand():
+    def __init__(self, game):
+        self.hand = []
+        self.game = game
+
+    def initialiseHand(self):
+        if turn == 0:
+            for i in range(5):
+                self.drawCards_p()
+        else:
+            for i in range(5):
+                self.drawCards_c()
+        return self.hand
+
+
+    def blitHand_p(self):
+        handPos_x = 250
+        handPos_y = 600
+        for card in range(len(self.hand)):
+            self.hand[card].rect.topleft = (handPos_x, handPos_y)
+            self.game.screen.blit(self.hand[card].image, (self.hand[card].rect.topleft))
+            handPos_x += 130
+
+    def blitHand_c(self):
+        handPos_x = 1190
+        handPos_y = 30
+        for card in range(len(self.hand)):
+            self.hand[card].rect.topleft = (handPos_x, handPos_y)
+            self.game.screen.blit(self.hand[card].image, (self.hand[card].rect.topleft))
+            handPos_x -= 130
+
+    def drawCards_p(self):
+        global turn
+        global playerTakenTurn
+        global canUndo
+        drawn = self.game.deck.cards.pop(0)
+        drawn.faceUp = True
+        drawn.cardColour(drawn.faceUp, drawn.cardType)
+        self.hand.append(drawn)
+        drawn.in_hand = 1
+        turn += 1
+        if playerTakenTurn == False:
+            canUndo = False
+            print("can be undone = ", canUndo)
+        else:
+            print("can be undone = ", canUndo)
+        playerTakenTurn = False  
+
+    def drawCards_c(self):
+        global turn
+        global playerTakenTurn
+        global canUndo
+        drawn = self.game.deck.cards.pop(0)
+        self.hand.append(drawn)
+        drawn.in_hand = 2
+        turn -= 1
+        if playerTakenTurn == False:
+            canUndo = False
+            print("can be undone = ", canUndo)
+        else:
+            print("can be undone = ", canUndo)
+        playerTakenTurn = False
+
+
+    def cardsInHand(self):
+        present = []
+        for card in self.hand:
+            if card.cardType == "heal":
+                present.append("heal")
+            elif card.cardType == "attack":
+                present.append("attack")
+            elif card.cardType == "skip":
+                present.append("skip")
+            elif card.cardType == "lifeSteal":
+                present.append("lifeSteal")
+            elif card.cardType == "cardSteal":
+                present.append("cardSteal")
+            elif card.cardType == "undo":
+                present.append("undo")
+        return present
+                
+
+class PlayPile():
+    def __init__(self):
+        self.cardsPlayed = []
+        
+    def move_card(self, cardClicked):
+        global lastPlayer #variable storing the last person to play a card for the undo card
+        global playerTakenTurn
+        global canUndo
+        self.cardsPlayed.append(cardClicked) #add the card to the played card list
+        playedCard = self.cardsPlayed[len(self.cardsPlayed)-1] #takes most recent card and allows the attributes to be changed
+        playedCard.faceUp = True
+        playedCard.cardColour(playedCard.faceUp, playedCard.cardType)
+        playedCard.rect.topleft = (800, 300) #change the topleft value (won't be mistaken for being a hand card)
+        playedCard.in_hand = 4 #change the location value
+        print(playedCard.cardType)
+        playedCard.interaction(self)
+        playerTakenTurn = True
+        if turn == 0:
+            lastPlayer = "human"
+        else:
+            lastPlayer = "cpu"
+        print("last player to play a card = ", lastPlayer)
+        if playedCard.cardType != "undo":
+            canUndo = True
+            print("this card can be undone (in playpile)")
+        elif turn == 0 and lastPlayer != "human":
+            canUndo = True
+        elif turn == 1 and lastPlayer != "cpu":
+            canUndo = True
+        else:
+            print("can't undo this card (in playpile)")
+        
+
+    def blitPlayed(self):
+        #blit the most recently played card to the screen
+        if len(self.cardsPlayed) > 0:
+            game.screen.blit(self.cardsPlayed[len(self.cardsPlayed)-1].image, (self.cardsPlayed[len(self.cardsPlayed)-1].rect.topleft))
+
+
+class Game():
+    def __init__(self, human, cpu):
+        pygame.init()
+        self.clock = pygame.time.Clock()
+        self.screen = pygame.display.set_mode((1530, 790))
+        pygame.display.set_caption("Card game")
+        self.fps = 60
+        self.deck = Deck()
+        self.deck.initialiseDeck(self)
+        self.humanHand = PlayerHand(self)
+        self.humanHand.initialiseHand()
+        self.cpuHand = PlayerHand(self)
+        self.cpuHand.initialiseHand()
+        self.playPile = PlayPile()
+        self.human = human
+        self.cpu = cpu
+        self.loser = None
+
+    def events(self):
+        self.mouse_pressed = 0
+        self.mouse_pos = pygame.mouse.get_pos()
+        self.deck_clicked = False
+        self.hand_clicked = False
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                self.running = False
+            elif event.type == pygame.MOUSEBUTTONDOWN:
+                self.mouse_pressed = event.button
+                if self.mouse_pressed == 1:
+                    for card in self.deck.allCards.sprites():
+                        card.on_click(self.mouse_pos)
+                        if self.deck_clicked == True:
+                            break #stop looping through the cards from here
+                        elif self.hand_clicked == True:
+                            clicked = self.humanHand.hand.index(card) #take the index value of the card's position in the list to remove it
+                            playCards(clicked)
+                            break #stop looping through the cards
+                
+    def draw(self):
+        background()
+        self.deck.blitDeck()
+        self.human.blitPlayer()
+        self.human.blitHealth()
+        self.humanHand.blitHand_p()
+        self.cpu.blitHealth()
+        self.cpu.blitPlayer()
+        self.cpuHand.blitHand_c()
+        self.playPile.blitPlayed()
+        notifications(turn)
+        pygame.display.update()
+
+    def run(self):
+        self.running = True
+        while self.running:
+            self.clock.tick(self.fps)
+            self.draw()
+            if turn == 0:
+                self.events()
+            else:
+                pygame.time.wait(500)
+                game.cpu.comDecisions()
+            game.human.checkHealth()
+            game.cpu.checkHealth()
+            if game.human.dead == True:
+                self.loser = "human loses"
+                self.running = False
+            elif game.cpu.dead == True:
+                self.loser = "cpu loses"
+                self.running = False
+            elif len(game.deck.cards) == 0 and len(game.humanHand.hand) == 0:
+                self.loser = "draw - human has no cards left"
+                self.running = False
+            elif len(game.deck.cards) == 0 and len(game.cpuHand.hand) == 0:
+                self.loser = "draw - cpu has no cards left"
+                self.running = False
+        print(self.loser)
+        pygame.quit()
+
+
+#when a player decides to draw a card, this will be carried out
+#applies to human only
+def playCards(clicked):
+    card = game.humanHand.hand.pop(clicked) #removes card from hand, puts the card into a variable
+    game.playPile.move_card(card) #this will add the card to the play pile
+    
+
+#blit the background onto the screen
+def background():
+    bg = pygame.image.load('Scene-1_resized.jpg').convert_alpha()
+    game.screen.blit(bg, (0, 0))
+
+def notifications(turn):
+    notificationFont = pygame.font.Font(None, 50)
+    if turn == 0:
+        current = notificationFont.render("It's your turn.", True, BLACK, WHITE)
+        game.screen.blit(current, (10, 10))
+    elif turn == 1:
+        current = notificationFont.render("It's your opponent's turn.", True, BLACK, WHITE)
+        game.screen.blit(current, (10, 10))
+
+
+#create 2 players, human and computer with positions of where they will be drawn (x and y) and their initial hp, set to max
+human = Player(60, 650, 180, 100)
+cpu = Player(1400, 30, 1320, 100)
+
+game = Game(human, cpu)
+game.run()
